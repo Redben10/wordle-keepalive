@@ -1,0 +1,12 @@
+{
+  "name": "wordle-keepalive",
+  "version": "1.0.0",
+  "description": "Keep-alive worker for Wordle server",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.2"
+  }
+}

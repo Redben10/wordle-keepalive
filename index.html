@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wordle Keep-Alive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121213;
+            color: #d7dadc;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #538d4e;
+            margin-bottom: 20px;
+        }
+
+        .config-section {
+            background-color: #1a1a1b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-section h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #818384;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #3a3a3c;
+            border-radius: 4px;
+            background-color: #121213;
+            color: #d7dadc;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #538d4e;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #538d4e;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #6aaa64;
+        }
+
+        .btn-danger {
+            background-color: #c0392b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #e74c3c;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-section {
+            background-color: #1a1a1b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #c0392b;
+        }
+
+        .status-dot.connected {
+            background-color: #538d4e;
+        }
+
+        .status-dot.running {
+            background-color: #f39c12;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background-color: #121213;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #538d4e;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #818384;
+            margin-top: 5px;
+        }
+
+        .log-section {
+            background-color: #1a1a1b;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .log-section h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #818384;
+        }
+
+        .log-container {
+            background-color: #121213;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #3a3a3c;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .log-time {
+            color: #818384;
+            margin-right: 10px;
+        }
+
+        .log-action {
+            color: #b59f3b;
+        }
+
+        .log-success {
+            color: #538d4e;
+        }
+
+        .log-info {
+            color: #3498db;
+        }
+
+        .next-action {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #121213;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .next-action span {
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Wordle Keep-Alive</h1>
+
+        <div class="config-section">
+            <h2>Server</h2>
+            <p style="color: #538d4e; font-size: 14px; margin-bottom: 15px;">https://wordle.geobattery.com/</p>
+            <div class="buttons">
+                <button id="stop-btn" class="btn btn-danger" disabled>Stop</button>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <div class="status-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Disconnected</span>
+            </div>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="rooms-created">0</div>
+                    <div class="stat-label">Rooms Created</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="messages-sent">0</div>
+                    <div class="stat-label">Messages Sent</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="uptime">0m</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="actions-count">0</div>
+                    <div class="stat-label">Total Actions</div>
+                </div>
+            </div>
+            <div class="next-action" id="next-action-container" style="display: none;">
+                Next action in: <span id="next-action-time">--</span>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h2>Activity Log</h2>
+            <div class="log-container" id="log-container">
+                <div class="log-entry">
+                    <span class="log-info">Waiting to start...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Configuration
+        const SERVER_URL = 'https://wordle.geobattery.com/';
+        let socket = null;
+        let isRunning = false;
+        let actionTimeout = null;
+        let countdownInterval = null;
+        let uptimeInterval = null;
+        let startTime = null;
+
+        // Stats
+        let stats = {
+            roomsCreated: 0,
+            messagesSent: 0,
+            actionsCount: 0
+        };
+
+        // Player simulation data
+        const playerName = 'KeepAliveBot_' + Math.random().toString(36).substring(2, 6);
+        let myFriendCode = null;
+        let currentRoomCode = null;
+
+        // DOM Elements
+        const stopBtn = document.getElementById('stop-btn');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const logContainer = document.getElementById('log-container');
+        const nextActionContainer = document.getElementById('next-action-container');
+        const nextActionTime = document.getElementById('next-action-time');
+
+        // Random helper functions
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function randomDelay() {
+            // Random delay between 8-15 minutes (in ms)
+            return randomInt(8 * 60 * 1000, 15 * 60 * 1000);
+        }
+
+        function formatTime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+
+        function formatUptime(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const hours = Math.floor(minutes / 60);
+            const remainingMins = minutes % 60;
+            if (hours > 0) {
+                return `${hours}h ${remainingMins}m`;
+            }
+            return `${minutes}m`;
+        }
+
+        // Logging
+        function log(message, type = 'info') {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${timeStr}]</span><span class="log-${type}">${message}</span>`;
+            
+            // Insert at top
+            if (logContainer.firstChild) {
+                logContainer.insertBefore(entry, logContainer.firstChild);
+            } else {
+                logContainer.appendChild(entry);
+            }
+
+            // Keep only last 50 entries
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        // Update stats display
+        function updateStats() {
+            document.getElementById('rooms-created').textContent = stats.roomsCreated;
+            document.getElementById('messages-sent').textContent = stats.messagesSent;
+            document.getElementById('actions-count').textContent = stats.actionsCount;
+            
+            if (startTime) {
+                const uptime = Date.now() - startTime;
+                document.getElementById('uptime').textContent = formatUptime(uptime);
+            }
+        }
+
+        // Simulated player actions
+        const actions = [
+            {
+                name: 'Create and join room',
+                weight: 3,
+                execute: () => {
+                    return new Promise((resolve) => {
+                        log('Creating a new room...', 'action');
+                        socket.emit('createRoom', { 
+                            maxPlayers: randomInt(2, 6), 
+                            maxRounds: randomInt(3, 10),
+                            playerName: playerName
+                        });
+                        
+                        socket.once('roomCreated', (data) => {
+                            currentRoomCode = data.roomCode;
+                            stats.roomsCreated++;
+                            stats.actionsCount++;
+                            log(`Room created: ${data.roomCode}`, 'success');
+                            updateStats();
+                            
+                            // Leave room after a bit
+                            setTimeout(() => {
+                                if (currentRoomCode) {
+                                    socket.emit('leaveRoom');
+                                    log(`Left room: ${currentRoomCode}`, 'info');
+                                    currentRoomCode = null;
+                                }
+                                resolve();
+                            }, randomInt(5000, 15000));
+                        });
+                        
+                        // Timeout in case room creation fails
+                        setTimeout(() => resolve(), 20000);
+                    });
+                }
+            },
+            {
+                name: 'Send self message',
+                weight: 2,
+                execute: () => {
+                    return new Promise((resolve) => {
+                        if (!myFriendCode) {
+                            log('No friend code yet, skipping message', 'info');
+                            resolve();
+                            return;
+                        }
+                        
+                        const messages = [
+                            'ping',
+                            'still here',
+                            'keepalive',
+                            '👋',
+                            'test',
+                            'hello',
+                            'checking in'
+                        ];
+                        
+                        const msg = messages[randomInt(0, messages.length - 1)];
+                        socket.emit('sendChatMessage', {
+                            toFriendCode: myFriendCode,
+                            message: msg
+                        });
+                        
+                        stats.messagesSent++;
+                        stats.actionsCount++;
+                        log(`Sent message: "${msg}"`, 'success');
+                        updateStats();
+                        resolve();
+                    });
+                }
+            },
+            {
+                name: 'Update status',
+                weight: 2,
+                execute: () => {
+                    return new Promise((resolve) => {
+                        // Toggle away status
+                        const isAway = Math.random() > 0.5;
+                        socket.emit('updateAwayStatus', { away: isAway });
+                        stats.actionsCount++;
+                        log(`Updated status: ${isAway ? 'Away' : 'Online'}`, 'success');
+                        updateStats();
+                        resolve();
+                    });
+                }
+            },
+            {
+                name: 'Browse rooms',
+                weight: 3,
+                execute: () => {
+                    return new Promise((resolve) => {
+                        log('Browsing for rooms...', 'action');
+                        // Just emit some events to look like browsing
+                        socket.emit('updateRoomStatus', { inRoom: false, roomCode: null });
+                        stats.actionsCount++;
+                        log('Finished browsing', 'success');
+                        updateStats();
+                        resolve();
+                    });
+                }
+            }
+        ];
+
+        // Pick weighted random action
+        function pickAction() {
+            const totalWeight = actions.reduce((sum, a) => sum + a.weight, 0);
+            let random = Math.random() * totalWeight;
+            
+            for (const action of actions) {
+                random -= action.weight;
+                if (random <= 0) {
+                    return action;
+                }
+            }
+            return actions[0];
+        }
+
+        // Schedule next action
+        function scheduleNextAction() {
+            if (!isRunning) return;
+            
+            const delay = randomDelay();
+            let remaining = delay;
+            
+            nextActionContainer.style.display = 'block';
+            
+            // Update countdown
+            countdownInterval = setInterval(() => {
+                remaining -= 1000;
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    nextActionTime.textContent = 'Now!';
+                } else {
+                    nextActionTime.textContent = formatTime(remaining);
+                }
+            }, 1000);
+            
+            nextActionTime.textContent = formatTime(delay);
+            log(`Next action scheduled in ${formatTime(delay)}`, 'info');
+            
+            actionTimeout = setTimeout(async () => {
+                if (!isRunning) return;
+                
+                const action = pickAction();
+                log(`Executing: ${action.name}`, 'action');
+                
+                try {
+                    await action.execute();
+                } catch (err) {
+                    log(`Error: ${err.message}`, 'info');
+                }
+                
+                // Schedule next action
+                scheduleNextAction();
+            }, delay);
+        }
+
+        // Connect to server
+        function connect(url) {
+            return new Promise((resolve, reject) => {
+                try {
+                    socket = io(url, {
+                        transports: ['websocket', 'polling'],
+                        reconnection: true,
+                        reconnectionAttempts: 10,
+                        reconnectionDelay: 1000
+                    });
+                    
+                    socket.on('connect', () => {
+                        log('Connected to server!', 'success');
+                        statusDot.className = 'status-dot connected';
+                        statusText.textContent = 'Connected';
+                        
+                        // Register as a user
+                        socket.emit('registerUser', { name: playerName });
+                        resolve();
+                    });
+                    
+                    socket.on('friendCodeAssigned', (data) => {
+                        myFriendCode = data.friendCode;
+                        log(`Assigned friend code: ${myFriendCode}`, 'info');
+                    });
+                    
+                    socket.on('disconnect', () => {
+                        log('Disconnected from server', 'info');
+                        statusDot.className = 'status-dot';
+                        statusText.textContent = 'Disconnected';
+                        
+                        // Auto-restart if we were running
+                        if (isRunning) {
+                            log('Auto-reconnecting in 10 seconds...', 'info');
+                            isRunning = false;
+                            setTimeout(start, 10000);
+                        }
+                    });
+                    
+                    socket.on('connect_error', (err) => {
+                        log(`Connection error: ${err.message}`, 'info');
+                        reject(err);
+                    });
+                    
+                    // Listen for various events to look like a real client
+                    socket.on('roomCreated', () => {});
+                    socket.on('roomJoined', () => {});
+                    socket.on('playerJoined', () => {});
+                    socket.on('playerLeft', () => {});
+                    socket.on('chatMessage', () => {});
+                    socket.on('gameInvite', () => {});
+                    
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        // Start keep-alive
+        async function start() {
+            if (isRunning) return;
+            
+            log('Connecting to server...', 'action');
+            
+            try {
+                await connect(SERVER_URL);
+                
+                isRunning = true;
+                startTime = Date.now();
+                stopBtn.disabled = false;
+                statusDot.className = 'status-dot running';
+                statusText.textContent = 'Running';
+                
+                // Start uptime counter
+                uptimeInterval = setInterval(updateStats, 1000);
+                
+                // Do an initial action after a short delay
+                setTimeout(async () => {
+                    if (!isRunning) return;
+                    const action = pickAction();
+                    log(`Initial action: ${action.name}`, 'action');
+                    await action.execute();
+                    scheduleNextAction();
+                }, randomInt(3000, 8000));
+                
+                log('Keep-alive started!', 'success');
+                
+            } catch (err) {
+                log(`Failed to connect: ${err.message}`, 'info');
+                // Auto-retry after 30 seconds
+                log('Retrying in 30 seconds...', 'info');
+                setTimeout(start, 30000);
+            }
+        }
+
+        // Stop keep-alive
+        function stop() {
+            isRunning = false;
+            
+            if (actionTimeout) {
+                clearTimeout(actionTimeout);
+                actionTimeout = null;
+            }
+            
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            
+            if (uptimeInterval) {
+                clearInterval(uptimeInterval);
+                uptimeInterval = null;
+            }
+            
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            
+            stopBtn.disabled = true;
+            statusDot.className = 'status-dot';
+            statusText.textContent = 'Stopped';
+            nextActionContainer.style.display = 'none';
+            
+            log('Keep-alive stopped', 'info');
+        }
+
+        // Event listeners
+        stopBtn.addEventListener('click', stop);
+
+        // Auto-start on page load
+        window.addEventListener('load', () => {
+            log('Auto-starting keep-alive...', 'info');
+            setTimeout(start, 1000);
+        });
+
+        // Handle page visibility
+        document.addEventListener('visibilitychange', () => {
+            if (isRunning && socket) {
+                socket.emit('updateAwayStatus', { away: document.hidden });
+            }
+        });
+
+        // Warn before closing
+        window.addEventListener('beforeunload', (e) => {
+            if (isRunning) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    </script>
+</body>
+</html>
